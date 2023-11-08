@@ -21,18 +21,20 @@ map相当于引用普通的c++数组,进行矩阵操作,而不用copy数据
 typedef Eigen::Map<Eigen::VectorXd> VectorRef;
 typedef Eigen::Map<const Eigen::VectorXd> ConstVectorRef;
 
+//fptr为文件流，format为读取格式，往value中添加数据
 template<typename T>
 void FscanfOrDie(FILE *fptr, const char *format, T *value) {
     int num_scanned = fscanf(fptr, format, value);
     if (num_scanned != 1)
         std::cerr << "Invalid UW data file. ";
 }
-
+//给point添加正态分布随机噪声
 void PerturbPoint3(const double sigma, double *point) {
     for (int i = 0; i < 3; ++i)
         point[i] += RandNormal() * sigma;
 }
 
+//获得排在data中间的点，nth_element即排序第K小的值
 double Median(std::vector<double> *data) {
     int n = data->size();
     std::vector<double>::iterator mid_point = data->begin() + n / 2;
@@ -48,44 +50,58 @@ BALProblem::BALProblem(const std::string &filename, bool use_quaternions) {
         return;
     };
 
-    // This wil die horribly on invalid files. Them's the breaks.
-    FscanfOrDie(fptr, "%d", &num_cameras_);
-    FscanfOrDie(fptr, "%d", &num_points_);
-    FscanfOrDie(fptr, "%d", &num_observations_);
+    //例：BAL数据集说明。第一行：
+    //16 22106 83718
+    //16个相机，22106个点，共进行83718次相机对点的观测
+    //第2行到83719行：
+    //6 18595     3.775000e+01 4.703003e+01
+    //第6个相机观测18595个点，得到的相机的观测数据为3.775000e+01 4.703003e+01
+    //第83720行到83720+16*9=83864
+    //共16个相机的9纬参数：-R（3维），t（3维），f（焦距），k1,k2畸变参数
+    //第83864到83864+3*22106=150182
+    //22106个点的三维坐标
+
+    FscanfOrDie(fptr, "%d", &num_cameras_);     //读取相机数量
+    FscanfOrDie(fptr, "%d", &num_points_);      //读取路标点
+    FscanfOrDie(fptr, "%d", &num_observations_);//读取观测点
 
     std::cout << "Header: " << num_cameras_
               << " " << num_points_
               << " " << num_observations_;
 
-    point_index_ = new int[num_observations_];
-    camera_index_ = new int[num_observations_];
-    observations_ = new double[2 * num_observations_];
+    //这里每一个观测点很多，所以以观测点的个数作为数组的大小，每一个观测点对应一个数组和一个相机
+    point_index_ = new int[num_observations_];         //指针指向创建的路标点数组
+    camera_index_ = new int[num_observations_];        //指针指向创建的相机数组
+    observations_ = new double[2 * num_observations_]; //指针指向观测点数组
 
-    num_parameters_ = 9 * num_cameras_ + 3 * num_points_;
-    parameters_ = new double[num_parameters_];
+    num_parameters_ = 9 * num_cameras_ + 3 * num_points_;  //得到相机(9数据)+路标点(3数据)的总内存
+    parameters_ = new double[num_parameters_];              //指针指向创建的总参数数组
 
     for (int i = 0; i < num_observations_; ++i) {
-        FscanfOrDie(fptr, "%d", camera_index_ + i);
-        FscanfOrDie(fptr, "%d", point_index_ + i);
+        FscanfOrDie(fptr, "%d", camera_index_ + i); //第几个相机
+        FscanfOrDie(fptr, "%d", point_index_ + i);  //第几个路标点
         for (int j = 0; j < 2; ++j) {
-            FscanfOrDie(fptr, "%lf", observations_ + 2 * i + j);
+            FscanfOrDie(fptr, "%lf", observations_ + 2 * i + j); //观测点
         }
     }
 
     for (int i = 0; i < num_parameters_; ++i) {
-        FscanfOrDie(fptr, "%lf", parameters_ + i);
+        FscanfOrDie(fptr, "%lf", parameters_ + i);  //读取相机的九个参数，轴角，平移，焦点，畸变参数
     }
 
     fclose(fptr);
-
+    //是否使用四元数
     use_quaternions_ = use_quaternions;
     if (use_quaternions) {
-        // Switch the angle-axis rotations to quaternions.
+        // 讲轴角变换为四元数
         num_parameters_ = 10 * num_cameras_ + 3 * num_points_;
+        //扩大数组的大小
         double *quaternion_parameters = new double[num_parameters_];
+        //相机参数和路标点的总参数
         double *original_cursor = parameters_;
         double *quaternion_cursor = quaternion_parameters;
         for (int i = 0; i < num_cameras_; ++i) {
+            //在总参数中取出轴角，计算四元数，轴角+3，四元数+4
             AngleAxisToQuaternion(original_cursor, quaternion_cursor);
             quaternion_cursor += 4;
             original_cursor += 3;
