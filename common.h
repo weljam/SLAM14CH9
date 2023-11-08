@@ -81,9 +81,9 @@ private:
                                     const double *center,
                                     double *camera) const;
 
-    int num_cameras_;
-    int num_points_;
-    int num_observations_;
+    int num_cameras_;       //相机个数
+    int num_points_;        //路标点个数
+    int num_observations_;  //观测点个数
     int num_parameters_;
     bool use_quaternions_;
 
