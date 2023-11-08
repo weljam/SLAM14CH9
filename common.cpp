@@ -268,6 +268,8 @@ void BALProblem::AngleAxisAndCenterToCamera(const double *angle_axis,
     VectorRef(camera + camera_block_size() - 6, 3) *= -1.0;
 }
 
+//将所有的路标点的中心值零进行归一化，然后再按照比例进行缩放
+//使优化数值更加稳定
 void BALProblem::Normalize() {
     // Compute the marginal median of the geometry
     std::vector<double> tmp(num_points_);
