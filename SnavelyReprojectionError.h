@@ -41,6 +41,7 @@ public:
         p[0] += camera[3];
         p[1] += camera[4];
         p[2] += camera[5];
+        //以上得到相机坐标系下的3d  观测点point
 
         //归一化平面，使用的数据是假设在投影平面之后，所以在去掉深度信息后，还需要乘以-1
         // Compute the center fo distortion
@@ -57,13 +58,13 @@ public:
         
         //focal焦点
         const T &focal = camera[6];
-        //u = fx*x_dis+cx,vfy*y_dis+cy
+        //u = fx*x_dis+cx,v = fy*y_dis+cy
         predictions[0] = focal * distortion * xp;
         predictions[1] = focal * distortion * yp;
 
         return true;
     }
-
+    //创建代价函数，并初始化变量
     static ceres::CostFunction *Create(const double observed_x, const double observed_y) {
         //输出维度2为误差项，即像素误差，输入维度，9为camera，3为地图点
         return (new ceres::AutoDiffCostFunction<SnavelyReprojectionError, 2, 9, 3>(

@@ -233,10 +233,10 @@ void BALProblem::CameraToAngelAxisAndCenter(const double *camera,
 
     // c = -R't
     //center是相机原点在世界坐标系下的定义
-    //Xw:世界坐标系下的相机坐标
+    //Xw:世界坐标系下的相机原点坐标
     //Xc:相机坐标系下的相机原点坐标（0,0,0）
     //根据相机坐标系与世界坐标系的转换关系：Xc = RXw + t
-    //所以t = RXw,所以得到 Xw = -R't
+    //所以t = -RXw,所以得到 Xw = -R't
     //旋转向量的反向过程（求逆）和旋转向量取负一样。
     Eigen::VectorXd inverse_rotation = -angle_axis_ref;
     AngleAxisRotatePoint(inverse_rotation.data(),
@@ -270,12 +270,12 @@ void BALProblem::AngleAxisAndCenterToCamera(const double *angle_axis,
 
 //将所有的路标点的中心值零进行归一化，然后再按照比例进行缩放
 //使优化数值更加稳定
+//这里可以把他理解为将整个场景进行平移，并按照一定的比例缩放
 void BALProblem::Normalize() {
     // Compute the marginal median of the geometry
     std::vector<double> tmp(num_points_);
     Eigen::Vector3d median;
     double *points = mutable_points();
-    //中位数误差MAD，剔除异常点
     //获得路标点x,y,z的中位数
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < num_points_; ++j) {
@@ -291,9 +291,7 @@ void BALProblem::Normalize() {
 
     const double median_absolute_deviation = Median(&tmp);//得到1范数的中位数
 
-    // Scale so that the median absolute deviation of the resulting
-    // reconstruction is 100
-
+    //按照比例进行缩放
     const double scale = 100.0 / median_absolute_deviation;
 
     // X = scale * (X - median)
